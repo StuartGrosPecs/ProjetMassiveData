@@ -2,37 +2,39 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-# === Chargement des données ===
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CSV_PATH = os.path.join(ROOT, "out", "conc.csv")
+# Trouver la racine du projet
+ROOT = os.path.dirname(
+    os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__))
+        )
+    )
+)
+
+CSV_PATH = os.path.join(ROOT, "out", "post.csv")
 PLOT_DIR = os.path.join(ROOT, "plots")
 os.makedirs(PLOT_DIR, exist_ok=True)
-PLOT_PATH = os.path.join(PLOT_DIR, "conc_barplot.png")
+PLOT_PATH = os.path.join(PLOT_DIR, "post_barplot.png")
 
 df = pd.read_csv(CSV_PATH)
-
-# Vérifier que les données sont bien en float
 df["AVG_TIME"] = df["AVG_TIME"].astype(float)
 
-# === Agrégation : moyenne et écart-type ===
 grouped = df.groupby("PARAM")["AVG_TIME"].agg(["mean", "std"]).reset_index()
 
-# === Création du graphique ===
 plt.figure(figsize=(10, 6))
-
 plt.bar(
     grouped["PARAM"].astype(str),
     grouped["mean"],
     yerr=grouped["std"],
     capsize=8,
-    color="#72A0FF",
+    color="#77DD77",
     edgecolor="black",
-    alpha=0.8
+    alpha=0.85
 )
 
-plt.title("Temps moyen par requête selon la concurrence", fontsize=16)
-plt.xlabel("Nombre d'utilisateurs concurrents", fontsize=13)
-plt.ylabel("Temps moyen par requête (ms)", fontsize=13)
+plt.title("Impact du nombre de posts par utilisateur", fontsize=16)
+plt.xlabel("Posts par utilisateur", fontsize=13)
+plt.ylabel("Temps moyen (ms)", fontsize=13)
 plt.grid(axis="y", linestyle="--", alpha=0.4)
 
 plt.tight_layout()
