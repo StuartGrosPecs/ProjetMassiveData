@@ -8,9 +8,7 @@ if [ -z "$1" ]; then
 fi
 
 FANOUT=$1
-
-USERS=101
-
+USERS=1000
 POSTS_PER_USER=100
 TOTAL_POSTS=$((POSTS_PER_USER * USERS))
 

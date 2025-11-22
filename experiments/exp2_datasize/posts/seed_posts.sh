@@ -8,9 +8,7 @@ if [ -z "$1" ]; then
 fi
 
 POSTS_PER_USER=$1
-
-# 21 users au minimum car "Fixer le nombre de followers à 20"
-USERS=30
+USERS=1000
 TOTAL_POSTS=$((POSTS_PER_USER * USERS))
 
 echo "Reset Datastore..."
