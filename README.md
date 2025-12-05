@@ -1,7 +1,6 @@
 # Massive Data & Cloud – TinyInsta Benchmarks
 
-Ce dépôt contient les scripts et ressources utilisés pour exécuter des benchmarks sur l’application TinyInsta
-(déployée sur Google Cloud App Engine, avec Google Cloud Datastore comme base NoSQL).
+Ce dépôt contient les scripts et ressources utilisés pour exécuter des benchmarks sur l’application TinyInsta, déployée sur GCP.
 
 Les expériences couvrent principalement :
 - la concurrence (nombre d’utilisateurs simultanés),
@@ -346,4 +345,4 @@ Les graphiques correspondants sont enregistrés dans le répertoire `plots/` :
 
 ## URL de la webapp déployée
 
-https://projectcloud-479410.ew.r.appspot.com
+https://projetmassivedata.appspot.com/
