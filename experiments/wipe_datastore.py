@@ -4,7 +4,7 @@ import time
 client = datastore.Client()
 
 BATCH_SIZE = 300     # Taille sûre pour éviter contention
-MAX_RETRY = 5        # Réessayer plusieurs fois si Datastore refuse
+MAX_RETRY = 5
 
 def delete_kind(kind):
     print(f"Deleting all entities of kind: {kind}")

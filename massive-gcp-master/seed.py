@@ -67,7 +67,7 @@ def assign_follows(client: datastore.Client, names: list[str], fmin: int, fmax: 
         if not dry:
             client.put(entity)
 
-
+"""
 def create_posts(client: datastore.Client, names: list[str], total_posts: int, dry: bool):
     if not names or total_posts <= 0:
         return 0
@@ -86,7 +86,32 @@ def create_posts(client: datastore.Client, names: list[str], total_posts: int, d
             client.put(post)
         created += 1
     return created
-
+"""
+def create_posts(client: datastore.Client, names: list[str], total_posts: int, dry: bool):
+    if not names or total_posts <= 0:
+        return 0
+    created = 0
+    base_time = datetime.utcnow()
+    cpt=0
+    for i in range(total_posts):
+        if cpt==0:
+            batch=client.batch()
+            batch.begin()
+        cpt+=1
+        author = random.choice(names)
+        key = client.key('Post')
+        post = datastore.Entity(key)
+        post['author'] = author
+        post['content'] = f"Seed post {i+1} by {author}"
+        post['created'] = base_time - timedelta(seconds=i)
+        if not dry:
+            batch.put(post)
+        created += 1
+        if cpt==500:
+            batch.commit()
+            cpt=0
+            print(f"**[Seed] Posts créés: {created}**")
+    return created
 
 def main():
     args = parse_args()

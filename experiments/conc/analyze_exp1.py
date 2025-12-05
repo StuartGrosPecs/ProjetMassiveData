@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-# === Chargement des données ===
+# Chargement des données
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CSV_PATH = os.path.join(ROOT, "out", "conc.csv")
 PLOT_DIR = os.path.join(ROOT, "plots")
@@ -14,10 +14,10 @@ df = pd.read_csv(CSV_PATH)
 # Vérifier que les données sont bien en float
 df["AVG_TIME"] = df["AVG_TIME"].astype(float)
 
-# === Agrégation : moyenne et écart-type ===
+# Agrégation : moyenne et écart-type
 grouped = df.groupby("PARAM")["AVG_TIME"].agg(["mean", "std"]).reset_index()
 
-# === Création du graphique ===
+# Création du graphique
 plt.figure(figsize=(10, 6))
 
 plt.bar(

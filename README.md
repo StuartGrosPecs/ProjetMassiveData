@@ -1,229 +1,349 @@
-# **Projet Données Massives & Cloud — Benchmark TinyInsta**
+# Massive Data & Cloud – TinyInsta Benchmarks
 
-Ce projet analyse les performances de l’application **TinyInsta**, un mini-réseau social permettant de :
+Ce dépôt contient les scripts et ressources utilisés pour exécuter des benchmarks sur l’application TinyInsta
+(déployée sur Google Cloud App Engine, avec Google Cloud Datastore comme base NoSQL).
 
-* créer des posts,
-* suivre des utilisateurs,
-* visualiser une timeline.
+Les expériences couvrent principalement :
+- la concurrence (nombre d’utilisateurs simultanés),
+- la taille des données (nombre total de posts),
+- le fanout (nombre de followees par utilisateur).
 
-L’objectif est d’étudier :
 
-* **L’impact de la concurrence**
-* **L’impact de la taille des données**
+## 1. Organisation du dépôt
 
----
-
-## **🔗 Webapp GCP déployée**
-
- [https://projetmassivedata.appspot.com](https://projetmassivedata.appspot.com)
-
----
-
-# **Structure du dépôt**
-
-```
+```text
+.
 ├── experiments
-│   ├── exp1_concurrency
-│   ├── exp2_datasize
+│   ├── conc
+│   │   ├── analyze_exp1.py
+│   │   ├── benchmark_exp1.py
+│   │   ├── __pycache__/
+│   │   └── seed_exp1.sh
+│   ├── fanout
+│   │   ├── analyze_exp2_fanout.py
+│   │   ├── bench_fanout.py
+│   │   ├── increase_fanout.py
+│   │   ├── run_fanout_copy.sh
+│   │   └── run_fanout.sh
+│   ├── post
+│   │   ├── analyze_exp2_posts.py
+│   │   ├── bench_post_parallel.py
+│   │   └── seed_post_level.sh
 │   └── wipe_datastore.py
-├── massive-gcp-master/      # Backend TinyInsta
-├── out/                     # CSV du rendu final
+├── massive-gcp-master
+│   ├── app.yaml
+│   ├── index.yaml
+│   ├── main.py
+│   ├── NOTES.md
+│   ├── README.md
+│   ├── requirements.txt
+│   └── seed.py
+├── out
 │   ├── conc.csv
-│   ├── post.csv
-│   └── fanout.csv
-├── plots/                   # Graphiques finaux
+│   ├── fanout.csv
+│   └── post.csv
+├── plots
 │   ├── conc_barplot.png
-│   ├── post_barplot.png
-│   └── fanout_barplot.png
-└── README.md
+│   ├── fanout_barplot.png
+│   └── post_barplot.png
+├── README.md
+└── tools
+    ├── count_posts.py
+    └── count_users.py
 ```
 
----
+- `massive-gcp-master/` : code de l’application TinyInsta (App Engine).
+- `experiments/` : scripts de seed, de benchmark et d’analyse.
+- `out/` : résultats des benchmarks au format CSV.
+- `plots/` : graphiques générés à partir des CSV.
+- `tools/` : scripts utilitaires pour compter les utilisateurs et les posts.
 
-# **2. Initialisation du projet**
 
-## **2.1. Installation & environnement**
+## 2. Prérequis
 
-```sh
-git clone https://github.com/StuartGrosPecs/ProjetMassiveData
-cd ProjetMassiveData
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r massive-gcp-master/requirements.txt
-```
+### 2.1. Python
 
----
+- Python 3.x
+- Installation des dépendances de l’application dans `massive-gcp-master` :
 
-## **2.2. Configuration GCP**
-
-```sh
-gcloud init
-gcloud config set project projetmassivedata
-```
-
----
-
-## **2.3. Déploiement App Engine**
-
-```sh
+```bash
 cd massive-gcp-master
+pip install -r requirements.txt
+```
+
+### 2.2. Google Cloud SDK
+
+Un projet Google Cloud configuré et le SDK installé sont nécessaires pour déployer TinyInsta et accéder à Datastore.
+
+- Documentation : https://cloud.google.com/sdk
+
+### 2.3. ApacheBench (ab)
+
+Tous les benchmarks ont été effectués avec l’outil `ab` (ApacheBench).
+
+Exemples d’installation :
+
+- Debian / Ubuntu :
+
+```bash
+sudo apt-get update
+sudo apt-get install apache2-utils
+```
+
+- macOS (Homebrew) :
+
+```bash
+brew install httpd
+```
+
+La commande `ab` doit ensuite être disponible dans le PATH :
+
+```bash
+ab -V
+```
+
+### 2.4. Droits d’exécution des scripts shell
+
+Avant d’utiliser les scripts shell, il faut leur donner les droits d’exécution, par exemple :
+
+```bash
+chmod +x experiments/conc/seed_exp1.sh
+chmod +x experiments/post/seed_post_level.sh
+chmod +x experiments/fanout/run_fanout.sh
+chmod +x experiments/fanout/run_fanout_copy.sh
+```
+
+
+## 3. Déploiement de l’application TinyInsta
+
+Le code de l’application se trouve dans `massive-gcp-master/`.
+
+Exemple de déploiement sur App Engine (service standard) :
+
+```bash
+cd massive-gcp-master
+
+# Authentification et sélection du projet (si nécessaire)
+gcloud auth login
+gcloud config set project <PROJECT_ID>
+
+# Déploiement
 gcloud app deploy
 ```
 
-L’application sera accessible ici :
-➡️ [https://projetmassivedata.appspot.com](https://projetmassivedata.appspot.com)
-
----
+L’URL de l’application déployée est ensuite utilisée par les scripts de benchmark dans `experiments/`.
 
 
-# **3. Utilisation des expériences**
+## 4. Scripts utilitaires
 
-Les trois étapes sont indépendantes et doivent être lancées séparément.
----
+Les scripts suivants se trouvent dans le répertoire `tools/` :
 
-# **Étape 1 — Expérience 1 : Concurrency**
+- `count_users.py` : compte le nombre d’utilisateurs dans Datastore.
+- `count_posts.py` : compte le nombre de posts dans Datastore.
 
-### **Objectif**
+Ils peuvent être utilisés, par exemple, via :
 
-Mesurer la latence pour 1, 10, 20, 50, 100 et 1000 requêtes simultanées.
+```bash
+python tools/count_users.py
+python tools/count_posts.py
+```
 
-### **1. Seed**
 
-```sh
-cd experiments/exp1_concurrency
-chmod +x seed_exp1.sh
+## 5. Expériences
+
+Les résultats des expériences sont stockés dans le répertoire `out/` au format CSV, et les graphiques correspondants dans `plots/`.
+
+
+### 5.1. Expérience 1 – Concurrence
+
+Répertoire : `experiments/conc/`
+
+- `seed_exp1.sh` : script shell pour initialiser les données nécessaires à l’expérience de concurrence (utilisation du `seed.py` de l’application et/ou appels à Datastore).
+- `benchmark_exp1.py` : lance les benchmarks de concurrence, en utilisant l’outil `ab` avec différents niveaux de concurrence. Écrit les résultats dans `out/conc.csv`.
+- `analyze_exp1.py` : lit `out/conc.csv` et produit des statistiques et/ou des graphiques (par exemple `plots/conc_barplot.png`).
+
+L’expérience cible typiquement le point d’entrée `/api/timeline` de TinyInsta, avec un nombre variable d’utilisateurs ou de requêtes simultanées.
+
+Exemple d’utilisation (à adapter selon le script) :
+
+```bash
+cd experiments/conc
+
+# Préparation des données
 ./seed_exp1.sh
+
+# Lancement du benchmark
+python benchmark_exp1.py
+
+# Analyse des résultats
+python analyze_exp1.py
 ```
 
-### **2. Exécution du benchmark**
 
-```sh
-python3 benchmark_exp1.py
+### 5.2. Expérience 2 – Taille des données (posts)
+
+Répertoire : `experiments/post/`
+
+Cette expérience fait varier le nombre de posts par utilisateur. Les scripts prennent un paramètre indiquant le nombre de posts par utilisateur (par exemple 10, 100, 1000).
+
+- `seed_post_level.sh` : prépare différents niveaux de taille de données.
+
+  Usage :
+
+  ```bash
+  cd experiments/post
+  ./seed_post_level.sh <posts_per_user>
+  ```
+
+  Exemples :
+
+  ```bash
+  ./seed_post_level.sh 10    # ≈ 10 posts par utilisateur (≈ 10 000 posts)
+  ./seed_post_level.sh 100   # ≈ 100 posts par utilisateur (≈ 100 000 posts)
+  ./seed_post_level.sh 1000  # ≈ 1000 posts par utilisateur (≈ 1 000 000 posts)
+  ```
+
+  Le script appelle `seed.py` avec :
+  - `USERS = 1000`
+  - `FOLLOWS_MIN = 20`
+  - `FOLLOWS_MAX = 20`
+  - `PREFIX = "user"`
+
+- `bench_post_parallel.py` : lance des benchmarks en parallèle avec `ab`, en ciblant 50 timelines différentes (`user1` à `user50`).
+
+  Usage :
+
+  ```bash
+  python bench_post_parallel.py <posts_per_user>
+  ```
+
+  Exemples :
+
+  ```bash
+  python bench_post_parallel.py 10
+  python bench_post_parallel.py 100
+  python bench_post_parallel.py 1000
+  ```
+
+  Paramètres internes principaux :
+  - `APP_HOST = "https://projetmassivedata.appspot.com"`
+  - `USERS = 50` (50 timelines testées)
+  - `N_REQ_TOTAL = 100` (réparties sur les 50 utilisateurs)
+  - `N_REQ_PER_USER = N_REQ_TOTAL // USERS`
+  - `CONCURRENCY_PER_USER = 1` (un client `ab` par utilisateur)
+  - `RUNS = 3` (3 runs automatiques par valeur de `<posts_per_user>`)
+  - Résultats écrits dans `~/ProjetMassiveData/out/post.csv`
+
+  Le script :
+  - effectue une requête de “cold start” sur `user1` (non comptabilisée),
+  - lance en parallèle 50 processus `ab`,
+  - extrait pour chaque utilisateur le `Time per request` et le nombre de requêtes échouées,
+  - calcule un temps moyen global et un indicateur `FAILED` global (0 ou 1),
+  - ajoute une ligne par run dans `post.csv` :
+
+    ```text
+    PARAM,AVG_TIME,RUN,FAILED
+    ```
+
+- `analyze_exp2_posts.py` : analyse `out/post.csv` et génère les graphiques associés (`plots/post_barplot.png`).
+
+Exemple de séquence complète pour un niveau de posts donné :
+
+```bash
+cd experiments/post
+
+./seed_post_level.sh 100
+python bench_post_parallel.py 100
+python analyze_exp2_posts.py
 ```
 
-    Génère : `out/conc.csv`
 
-### **3. Analyse graphique**
+### 5.3. Expérience 3 – Fanout
 
-```sh
-python3 analyze_exp1.py
+Répertoire : `experiments/fanout/`
+
+Cette expérience fait varier le fanout (nombre de followees par utilisateur) pour mesurer l’impact sur les temps de réponse.
+
+Scripts principaux :
+- `increase_fanout.py` : ajuste le fanout pour certains utilisateurs dans Datastore.
+- `bench_fanout.py` : exécute les benchmarks en utilisant `ab` et écrit les résultats dans `out/fanout.csv`.
+- `analyze_exp2_fanout.py` : lit `out/fanout.csv` et produit les graphiques (`plots/fanout_barplot.png`).
+- `run_fanout.sh` : script d’orchestration qui enchaîne automatiquement les étapes de l’expérience (reset, seed, augmentation du fanout, benchmarks).
+
+Le script `run_fanout.sh` réalise :
+
+1. Reset du Datastore via `wipe_datastore.py`.
+2. Seed initial avec :
+   - `USERS = 1000`
+   - `POSTS = 100 * USERS`
+   - `FOLLOWS_MIN = 10`, `FOLLOWS_MAX = 10` (fanout initial 10)
+   - `PREFIX = "user"`
+3. Benchmark avec fanout = 10 :
+   ```bash
+   python bench_fanout.py --param 10
+   ```
+4. Augmentation du fanout à 50 :
+   ```bash
+   python increase_fanout.py --target-fanout 50 --prefix "user"
+   python bench_fanout.py --param 50
+   ```
+5. Augmentation du fanout à 100 :
+   ```bash
+   python increase_fanout.py --target-fanout 100 --prefix "user"
+   python bench_fanout.py --param 100
+   ```
+
+Usage typique :
+
+```bash
+cd experiments/fanout
+./run_fanout.sh
 ```
 
-    Produit : `plots/conc_barplot.png`
+Les résultats cumulés sont écrits dans `out/fanout.csv`.
 
----
 
-# **Étape 2 — Expérience 2A : Variation du nombre de posts**
+## 6. Réinitialisation des données
 
-### **Objectif**
-
-Tester l’effet de 10, 100, 1000 posts par utilisateur.
-
-### **1. Seed**
-
-```sh
-cd experiments/exp2_datasize/posts
-chmod +x seed_posts.sh
-./seed_posts.sh 10
-```
-
-Chaque seed prépare le Datastore pour le benchmark correspondant.
-
-### **2. Exécution du benchmark**
-
-```sh
-python3 benchmark_exp2_posts.py --posts 10
-```
-
-    Génère : `out/post.csv`
-
-**Répétez ensuite les étapes de seed et de benchmark avec les valeurs 100 puis 1000 en paramètre.**
-
-### **3. Analyse graphique**
-
-```sh
-python3 analyze_exp2_posts.py
-```
-
-    Produit : `plots/post_barplot.png`
-
----
-
-# **Étape 3 — Expérience 2B : Variation du fanout (followees)**
-
-### **Objectif**
-
-Tester l’effet de 10, 50, 100 followees.
-
-### **1. Seed (obligatoire)**
-
-```sh
-cd experiments/exp2_datasize/fanout
-chmod +x seed_fanout.sh
-./seed_fanout.sh 10
-```
-
-### **2. Exécution du benchmark**
-
-```sh
-python3 benchmark_exp2_fanout.py --followees 10
-```
-
-    Génère : `out/fanout.csv`
-
-**Répétez ensuite les étapes de seed et de benchmark avec les valeurs 50 puis 100 en paramètre.**
-
-### **3. Analyse graphique**
-
-```sh
-python3 analyze_exp2_fanout.py
-```
-
-    Produit : `plots/fanout_barplot.png`
-
----
-
-# **4. Format des CSV** Format des CSV**
-
-Tous les fichiers possèdent le header :
-
-```
-PARAM,AVG_TIME,RUN,FAILED
-```
+Le script `experiments/wipe_datastore.py` permet de nettoyer ou réinitialiser les données dans Datastore pour repartir sur une base saine entre deux séries de benchmarks.
 
 Exemple :
 
-```
-10,0.2589,1,0
-10,0.1794,2,0
-```
-
----
-
-# **5. Analyse globale**
-
-* Plus la **concurrence** augmente → latence plus élevée.
-
-
----
-
-# **6. Nettoyage du Datastore**
-
-```sh
+```bash
 cd experiments
-python3 wipe_datastore.py
+python wipe_datastore.py
 ```
 
 
-# **7. Outils**
+## 7. Résultats
 
-Pour vérifier le contenu du Datastore :
-```sh
-python3 tools/count_posts.py
-python3 tools/count_users.py
-```
+Les fichiers CSV suivants sont produits par les différents scripts de benchmark :
 
-# **8. Auteur**
+- `out/conc.csv` : résultats de l’expérience de concurrence.
+- `out/post.csv` : résultats de l’expérience sur la taille des données (posts).
+- `out/fanout.csv` : résultats de l’expérience sur le fanout.
 
-Projet réalisé par **Yanis Dabin**,
-dans le cadre du module **Données Massives & Cloud — 2025**.
+Les graphiques correspondants sont enregistrés dans le répertoire `plots/` :
+
+- `plots/conc_barplot.png`
+- `plots/post_barplot.png`
+- `plots/fanout_barplot.png`
+
+## 8. Graphiques
+
+### Concurrence
+
+![Concurrence](plots/conc_barplot.png)
+
+### Taille des données (posts)
+
+![Taille des données](plots/post_barplot.png)
+
+### Fanout
+
+![Fanout](plots/fanout_barplot.png)
+
+
+## URL de la webapp déployée
+
+https://projectcloud-479410.ew.r.appspot.com
